@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 카카오 인앱브라우저에서 iOS 확대 방지: 입력 폰트 16px 이상 유지 */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
