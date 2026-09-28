@@ -80,6 +80,7 @@ export async function saveTopic(
     description: payload.description?.trim() || null,
     deadline: deadlineToIso(payload.deadline),
     per_person_limit: payload.perPersonLimit,
+    capacity: payload.capacity,
     form_schema: payload.schema,
   };
 
@@ -109,6 +110,46 @@ export async function saveTopic(
   revalidatePath(`/${payload.slug}`);
   revalidatePath(`/admin/${payload.slug}`);
   return { ok: true, redirectTo: `/admin/${payload.slug}` };
+}
+
+/**
+ * 명단 등록 — "코드,성함,지점" 형식의 줄 텍스트를 붙여넣어 일괄 등록/갱신.
+ * 이미 있는 코드는 이름·지점을 갱신하고 active를 되살린다.
+ */
+export async function registerMembers(
+  _prev: { message?: string; error?: string },
+  formData: FormData
+): Promise<{ message?: string; error?: string }> {
+  const raw = formData.get("rows");
+  if (typeof raw !== "string" || !raw.trim()) return { error: "붙여넣은 내용이 없습니다." };
+
+  const rows: { code: string; name: string; branch: string; active: boolean }[] = [];
+  const bad: number[] = [];
+
+  raw.split("\n").forEach((line, i) => {
+    const t = line.trim();
+    if (!t) return;
+    // 쉼표/탭 구분 모두 허용 (엑셀에서 복사하면 탭으로 들어온다)
+    const parts = t.split(/[,\t]/).map((s) => s.trim());
+    const [code, name, branch] = parts;
+    if (!code || !/^[0-9]{1,10}$/.test(code) || !name || !branch) {
+      bad.push(i + 1);
+      return;
+    }
+    rows.push({ code, name, branch, active: true });
+  });
+
+  if (rows.length === 0)
+    return { error: `등록할 수 있는 줄이 없습니다. "코드,성함,지점" 형식인지 확인해주세요.${bad.length ? ` (문제 줄: ${bad.slice(0, 5).join(", ")}...)` : ""}` };
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("members").upsert(rows, { onConflict: "code" });
+  if (error) return { error: "저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." };
+
+  revalidatePath("/admin/members");
+  return {
+    message: `${rows.length}명 등록/갱신 완료${bad.length ? ` · 형식 오류로 건너뛴 줄 ${bad.length}개 (${bad.slice(0, 5).join(", ")}${bad.length > 5 ? "..." : ""}행)` : ""}`,
+  };
 }
 
 /** 제출 건 소프트 삭제 — 행을 지우지 않고 deleted_at만 찍는다 (실수 복구 가능) */

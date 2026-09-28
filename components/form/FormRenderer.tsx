@@ -7,8 +7,10 @@ import type {
   FormSchema,
   RepeatGroupField,
   SimpleField,
+  TextField,
 } from "@/lib/form-schema";
 import { validateAnswers, type FieldErrors } from "@/lib/validation";
+import AnswersSummary from "./AnswersSummary";
 import {
   AddressInput,
   CheckboxInput,
@@ -22,25 +24,31 @@ export type SubmitResult =
   | { ok: true; redirectTo: string }
   | { ok: false; errors?: FieldErrors; message?: string };
 
+type MemberCheck =
+  | { state: "ok"; name: string; branch: string }
+  | { state: "miss" }
+  | { state: "idle" };
+
 /**
  * form_schema JSON → 폼 렌더링.
- * 하드코딩 금지 원칙의 실체 — 제출 화면(신규)과 수정 화면이 이 컴포넌트 하나를 공유하고,
- * 4단계 폼 빌더의 "미리보기"도 이 컴포넌트를 재사용한다.
+ * 신규 제출·수정 화면·폼 빌더 미리보기가 이 컴포넌트 하나를 공유한다.
  */
 export default function FormRenderer({
   schema,
   initialAnswers,
   submitLabel,
   action,
+  stickySubmit = true,
 }: {
   schema: FormSchema;
   initialAnswers?: Answers;
   submitLabel: string;
   action: (answers: Answers) => Promise<SubmitResult>;
+  /** false면 하단 고정 대신 인라인 버튼 (빌더 미리보기용) */
+  stickySubmit?: boolean;
 }) {
   const [answers, setAnswers] = useState<Answers>(() => {
     const init: Answers = { ...(initialAnswers ?? {}) };
-    // required repeat_group은 최소 1건이 펼쳐진 상태로 시작
     for (const f of schema) {
       if (f.block === "repeat_group" && !Array.isArray(init[f.id])) {
         init[f.id] = f.required ? [{}] : [];
@@ -50,10 +58,39 @@ export default function FormRenderer({
   });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [serverMessage, setServerMessage] = useState<string>();
+  const [member, setMember] = useState<MemberCheck>({ state: "idle" });
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [sameAs, setSameAs] = useState<Record<string, boolean>>({});
   const [pending, startTransition] = useTransition();
 
+  /** sameAsRole 필드의 원본 필드 id 찾기 (예: 발송인 이름 ← 신청자 이름) */
+  const sourceIdOfRole = (role: string) =>
+    schema.find((f) => f.role === role && f.block !== "heading")?.id;
+
   const set = (id: string, v: Answers[string]) =>
-    setAnswers((a) => ({ ...a, [id]: v }));
+    setAnswers((a) => {
+      const next = { ...a, [id]: v };
+      // "신청자와 같습니다"가 체크된 필드는 원본이 바뀌면 함께 따라간다
+      for (const f of schema) {
+        if (
+          f.block === "text" &&
+          f.sameAsRole &&
+          sameAs[f.id] &&
+          sourceIdOfRole(f.sameAsRole) === id
+        ) {
+          next[f.id] = v;
+        }
+      }
+      return next;
+    });
+
+  const toggleSameAs = (fieldId: string, role: string, checked: boolean) => {
+    setSameAs((s) => ({ ...s, [fieldId]: checked }));
+    if (checked) {
+      const srcId = sourceIdOfRole(role);
+      if (srcId) setAnswers((a) => ({ ...a, [fieldId]: a[srcId] ?? "" }));
+    }
+  };
 
   const scrollToFirstError = (errs: FieldErrors) => {
     const first = Object.keys(errs)[0];
@@ -62,33 +99,98 @@ export default function FormRenderer({
     }
   };
 
+  /** 코드 필드 blur 시 명단 대조 → 성함·지점 자동 입력 */
+  const checkMember = async (code: string) => {
+    if (!code) return setMember({ state: "idle" });
+    try {
+      const res = await fetch(`/api/member?code=${encodeURIComponent(code)}`);
+      const data = await res.json();
+      if (data?.found) {
+        setMember({ state: "ok", name: data.name, branch: data.branch });
+        setAnswers((a) => {
+          const next = { ...a };
+          for (const f of schema) {
+            if (f.role === "submitter.name" && !next[f.id]) next[f.id] = data.name;
+            if (f.role === "submitter.branch" && !next[f.id]) next[f.id] = data.branch;
+          }
+          return next;
+        });
+      } else if (data?.registered === false) {
+        setMember({ state: "idle" }); // 명단 미등록 운영 상태 — 검증 안 함
+      } else {
+        setMember({ state: "miss" });
+      }
+    } catch {
+      setMember({ state: "idle" });
+    }
+  };
+
+  /** 1단계: 검증 통과 시 "입력 내용 확인" 시트를 연다 */
   const handleSubmit = () => {
     const errs = validateAnswers(schema, answers);
     setErrors(errs);
     setServerMessage(undefined);
     if (Object.keys(errs).length > 0) {
       scrollToFirstError(errs);
+      setServerMessage(`입력하지 않았거나 잘못된 항목이 ${Object.keys(errs).length}개 있어요. 빨간 표시를 확인해주세요.`);
       return;
     }
+    setShowConfirm(true);
+  };
+
+  /** 2단계: 확인 시트에서 최종 접수 — 실패해도 입력값은 그대로 유지된다 */
+  const doSubmit = () => {
     startTransition(async () => {
       const result = await action(answers);
       if (result.ok) {
         window.location.assign(result.redirectTo);
       } else {
+        setShowConfirm(false);
         if (result.errors) {
           setErrors(result.errors);
           scrollToFirstError(result.errors);
         }
-        setServerMessage(result.message ?? (result.errors ? undefined : "제출에 실패했습니다. 잠시 후 다시 시도해주세요."));
+        setServerMessage(result.message ?? (result.errors ? "입력 내용을 다시 확인해주세요." : "접수에 실패했어요. 입력 내용은 그대로 있으니 잠시 후 다시 시도해주세요."));
       }
     });
   };
 
-  const renderSimple = (field: SimpleField, path: string, value: Answers[string], onChange: (v: Answers[string]) => void) => {
+  const memberHint =
+    member.state === "ok" ? (
+      <span className="font-medium text-emerald-600">✓ {member.branch} · {member.name}님 확인되었습니다</span>
+    ) : member.state === "miss" ? (
+      <span className="font-medium text-orange-500">등록되지 않은 코드예요. 코드를 다시 확인해주세요.</span>
+    ) : undefined;
+
+  const renderSimple = (
+    field: SimpleField,
+    path: string,
+    value: Answers[string],
+    onChange: (v: Answers[string]) => void
+  ) => {
     const error = errors[path];
     switch (field.block) {
-      case "text":
-        return <TextInput key={path} field={field} path={path} value={(value as string) ?? ""} error={error} onChange={onChange} />;
+      case "text": {
+        const tf = field as TextField;
+        const isCode = field.role === "submitter.code";
+        const hasSameAs = !!tf.sameAsRole && path === field.id; // 반복그룹 내부에서는 비활성
+        return (
+          <TextInput
+            key={path}
+            field={tf}
+            path={path}
+            value={(value as string) ?? ""}
+            error={error}
+            hint={isCode ? memberHint : undefined}
+            onChange={onChange}
+            onBlur={isCode ? checkMember : undefined}
+            sameAsChecked={hasSameAs ? sameAs[field.id] : undefined}
+            onToggleSameAs={
+              hasSameAs ? (checked) => toggleSameAs(field.id, tf.sameAsRole!, checked) : undefined
+            }
+          />
+        );
+      }
       case "select":
         return <SelectInput key={path} field={field} path={path} value={(value as string) ?? ""} error={error} onChange={onChange} />;
       case "phone":
@@ -114,16 +216,21 @@ export default function FormRenderer({
     };
 
     return (
-      <div key={field.id} id={`f-${field.id}`} className="mb-6 scroll-mt-24">
+      <div key={field.id} id={`f-${field.id}`} className="mb-6 scroll-mt-28">
         {errors[field.id] && (
-          <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{errors[field.id]}</p>
+          <p className="mb-2 rounded-xl bg-red-50 px-3.5 py-2.5 text-sm font-medium text-red-600">
+            {errors[field.id]}
+          </p>
         )}
         {items.map((item, i) => (
-          <div key={i} className="mb-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between border-b border-gray-100 pb-2">
-              <span className="font-semibold text-brand">
+          <div key={i} className="card mb-3">
+            <div className="mb-3 flex items-center justify-between border-b border-gray-100 pb-2.5">
+              <span className="flex items-center gap-2 font-bold text-brand-ink">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+                  {i + 1}
+                </span>
                 {label} {i + 1}
-                {i >= min && <span className="ml-1 text-xs font-normal text-gray-400">(선택)</span>}
+                {i >= min && <span className="text-xs font-normal text-gray-400">(선택)</span>}
               </span>
               {items.length > min && (
                 <button
@@ -144,37 +251,95 @@ export default function FormRenderer({
           <button
             type="button"
             onClick={() => set(field.id, [...items, {}] as Answers[string])}
-            className="w-full rounded-xl border-2 border-dashed border-gray-300 py-3 text-sm text-gray-500"
+            className="w-full rounded-2xl border-2 border-dashed border-brand/25 bg-brand-light/40 py-3.5 text-sm font-semibold text-brand"
           >
-            + {label} 추가 ({items.length}/{max})
+            + {label} 추가하기 ({items.length}/{max})
           </button>
         )}
       </div>
     );
   };
 
-  return (
-    <div>
-      {schema.map((field) =>
-        field.block === "repeat_group"
-          ? renderRepeatGroup(field)
-          : renderSimple(field, field.id, answers[field.id], (v) => set(field.id, v))
-      )}
-
+  const submitButton = (
+    <>
       {serverMessage && (
-        <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {serverMessage}
-        </p>
+        <p className="mb-2 text-center text-xs font-medium text-red-500">{serverMessage}</p>
       )}
-
       <button
         type="button"
         disabled={pending}
         onClick={handleSubmit}
-        className="w-full rounded-xl bg-brand py-3.5 font-semibold text-white disabled:opacity-50"
+        className="btn-primary w-full py-4 text-base"
       >
-        {pending ? "처리 중..." : submitLabel}
+        {pending ? "접수하고 있어요..." : submitLabel}
       </button>
+    </>
+  );
+
+  return (
+    <div className={stickySubmit ? "pb-28" : ""}>
+      {schema.map((field) => {
+        if (field.block === "heading") {
+          return (
+            <h2
+              key={field.id}
+              className="mb-3 mt-7 flex items-center gap-2 text-[15px] font-bold text-brand-ink first:mt-0"
+            >
+              <span className="h-4 w-1 rounded-full bg-brand" aria-hidden />
+              {field.label}
+            </h2>
+          );
+        }
+        return field.block === "repeat_group"
+          ? renderRepeatGroup(field)
+          : renderSimple(field, field.id, answers[field.id], (v) => set(field.id, v));
+      })}
+
+      {stickySubmit ? (
+        <>
+          {/* 모바일: 하단 고정 바 */}
+          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-100 bg-white/95 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 shadow-floatbar backdrop-blur lg:hidden">
+            <div className="mx-auto max-w-md">{submitButton}</div>
+          </div>
+          {/* PC: 폼 흐름 안 인라인 버튼 */}
+          <div className="mt-6 hidden lg:block">{submitButton}</div>
+        </>
+      ) : (
+        <div className="mt-6">{submitButton}</div>
+      )}
+
+      {/* 제출 전 "입력 내용 확인" 시트 */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
+          <div className="flex max-h-[85vh] w-full max-w-md flex-col rounded-t-3xl bg-white sm:rounded-3xl">
+            <div className="border-b border-gray-100 px-5 py-4">
+              <h2 className="text-lg font-bold text-brand-ink">입력 내용을 확인해주세요</h2>
+              <p className="mt-0.5 text-xs text-gray-400">아래 내용으로 접수됩니다</p>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <AnswersSummary schema={schema} answers={answers} />
+            </div>
+            <div className="flex gap-2 border-t border-gray-100 px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-3">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => setShowConfirm(false)}
+                className="btn-ghost flex-1 py-3.5"
+              >
+                다시 수정하기
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={doSubmit}
+                className="btn-primary flex-1 py-3.5"
+              >
+                {pending ? "접수 중..." : "이대로 접수하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,7 +13,9 @@ export function validateTopicPayload(p: TopicPayload): string | null {
   if (p.deadline && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(p.deadline))
     return "마감일시 형식이 올바르지 않습니다.";
   if (p.perPersonLimit !== null && (p.perPersonLimit < 1 || p.perPersonLimit > 99))
-    return "인당 한도는 1~99 사이로 입력해주세요.";
+    return "인당 접수 한도는 1~99 사이로 입력해주세요.";
+  if (p.capacity !== null && (p.capacity < 1 || p.capacity > 10000))
+    return "정원은 1~10,000 사이로 입력해주세요.";
 
   const schema = p.schema as FormSchema;
   if (!Array.isArray(schema) || schema.length === 0)

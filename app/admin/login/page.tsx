@@ -17,7 +17,7 @@ export default function AdminLoginPage() {
           name="password"
           autoFocus
           placeholder="비밀번호"
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 outline-none focus:border-brand"
+          className="field-input"
         />
         {state.error && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{state.error}</p>
@@ -25,7 +25,7 @@ export default function AdminLoginPage() {
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-xl bg-brand py-3 font-semibold text-white disabled:opacity-50"
+          className="btn-primary w-full py-3.5"
         >
           {pending ? "확인 중..." : "로그인"}
         </button>

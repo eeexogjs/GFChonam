@@ -37,10 +37,10 @@ export default async function AdminHome() {
   const Card = ({ t }: { t: TopicListRow }) => (
     <Link
       href={`/admin/${t.slug}`}
-      className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-brand"
+      className="card flex items-center justify-between transition-all hover:border-brand/40 hover:shadow-lg"
     >
       <div>
-        <p className="font-semibold">{t.title}</p>
+        <p className="font-bold text-brand-ink">{t.title}</p>
         <p className="mt-0.5 text-xs text-gray-400">
           /{t.slug} · {t.type}
           {t.deadline && t.status === "open" && (
@@ -66,19 +66,19 @@ export default async function AdminHome() {
   return (
     <main>
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-bold">취합 주제</h1>
+        <h1 className="text-lg font-bold text-brand-ink">접수 관리</h1>
         <Link
           href="/admin/new"
-          className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white"
+          className="btn-primary px-4 py-2.5 text-sm"
         >
-          + 새 취합 만들기
+          + 새 접수 만들기
         </Link>
       </div>
 
       <section className="space-y-3">
         {open.length === 0 && (
-          <p className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-400">
-            진행 중인 취합이 없습니다
+          <p className="rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center text-sm text-gray-400">
+            진행 중인 접수가 없습니다 — 우측 상단에서 새로 만들 수 있어요
           </p>
         )}
         {open.map((t) => (

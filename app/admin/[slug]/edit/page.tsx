@@ -18,7 +18,7 @@ export default async function EditTopicPage({
 
   const { data: topic } = await admin
     .from("topics")
-    .select("title, slug, type, description, deadline, per_person_limit, form_schema, submissions(count)")
+    .select("title, slug, type, description, deadline, per_person_limit, capacity, form_schema, submissions(count)")
     .eq("slug", slug)
     .is("submissions.deleted_at", null)
     .single<{
@@ -28,6 +28,7 @@ export default async function EditTopicPage({
       description: string | null;
       deadline: string | null;
       per_person_limit: number | null;
+      capacity: number | null;
       form_schema: FormSchema;
       submissions: { count: number }[];
     }>();
@@ -45,6 +46,7 @@ export default async function EditTopicPage({
         description: topic.description ?? "",
         deadline: isoToDeadlineInput(topic.deadline),
         perPersonLimit: topic.per_person_limit,
+        capacity: topic.capacity,
         schema: topic.form_schema,
       }}
       action={saveTopic.bind(null, slug)}

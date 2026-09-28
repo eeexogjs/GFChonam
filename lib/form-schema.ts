@@ -5,6 +5,7 @@
  */
 
 export type FieldBlockType =
+  | "heading"
   | "text"
   | "select"
   | "phone"
@@ -24,12 +25,21 @@ interface BaseField {
   role?: "submitter.branch" | "submitter.name" | "submitter.code" | "submitter.phone";
 }
 
+/** 섹션 제목 — 입력값 없음, 폼을 시각적으로 구분하는 용도 */
+export interface HeadingField extends BaseField {
+  block: "heading";
+}
+
 export interface TextField extends BaseField {
   block: "text";
   /** 정규식 문자열 (예: 숫자만) */
   pattern?: string;
   patternMessage?: string;
   maxLength?: number;
+  /** "신청자와 같습니다" 자동 반영 — 복사해올 원본 필드의 role */
+  sameAsRole?: "submitter.name" | "submitter.branch" | "submitter.phone";
+  /** 체크박스에 표시할 문구 (기본: "신청자와 같습니다") */
+  sameAsLabel?: string;
 }
 
 export interface SelectField extends BaseField {
@@ -70,7 +80,12 @@ export type SimpleField =
   | DateField
   | CheckboxField;
 
-export type FieldBlock = SimpleField | RepeatGroupField;
+/** 값을 갖는 블록인지 (heading은 표시 전용) */
+export function isInputBlock(field: FieldBlock): boolean {
+  return field.block !== "heading";
+}
+
+export type FieldBlock = SimpleField | RepeatGroupField | HeadingField;
 
 export type FormSchema = FieldBlock[];
 
@@ -110,6 +125,7 @@ export function formatValue(field: FieldBlock, value: AnswerValue): string {
     return [v.address, v.detail].filter(Boolean).join(", ") + (v.postcode ? ` (${v.postcode})` : "");
   }
   if (field.block === "checkbox") return value ? "예" : "아니오";
+  if (field.block === "heading") return "";
   if (field.block === "repeat_group") return `${(value as unknown[]).length}건`;
   return String(value);
 }

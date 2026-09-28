@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import BrandHeader from "@/components/BrandHeader";
 import FormRenderer from "@/components/form/FormRenderer";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { Answers, FormSchema } from "@/lib/form-schema";
@@ -37,29 +38,31 @@ export default async function EditPage({
     (topic.deadline !== null && new Date(topic.deadline) <= new Date());
 
   return (
-    <main className="mx-auto max-w-md px-4 py-8 pb-16">
-      <header className="mb-6">
-        <h1 className="text-xl font-bold text-brand">{topic.title}</h1>
-        <p className="mt-1 text-sm text-gray-500">신청 내용 수정</p>
-      </header>
+    <>
+      <BrandHeader />
+      <main className="mx-auto max-w-md px-5 py-6">
+        <h1 className="text-[22px] font-extrabold leading-snug text-brand-ink">{topic.title}</h1>
+        <p className="mt-1 text-sm text-gray-500">신청 내용을 수정한 뒤 아래 버튼을 눌러주세요</p>
 
-      {closed ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-          <p className="text-lg font-semibold text-gray-700">마감되었습니다</p>
-          <p className="mt-2 text-sm text-gray-500">
-            마감된 취합은 수정할 수 없습니다.
-            <br />
-            변경이 필요하면 담당자에게 연락해주세요.
-          </p>
+        <div className="mt-6">
+          {closed ? (
+            <div className="card px-6 py-10 text-center">
+              <p className="text-4xl" aria-hidden>🔒</p>
+              <p className="mt-3 text-lg font-bold text-brand-ink">마감되어 수정할 수 없어요</p>
+              <p className="mt-2 text-sm leading-relaxed text-gray-500">
+                변경이 꼭 필요하면 담당자에게 연락해주세요.
+              </p>
+            </div>
+          ) : (
+            <FormRenderer
+              schema={topic.form_schema}
+              initialAnswers={submission.answers as Answers}
+              submitLabel="수정 완료하기"
+              action={updateAnswers.bind(null, slug, token)}
+            />
+          )}
         </div>
-      ) : (
-        <FormRenderer
-          schema={topic.form_schema}
-          initialAnswers={submission.answers as Answers}
-          submitLabel="수정 완료"
-          action={updateAnswers.bind(null, slug, token)}
-        />
-      )}
-    </main>
+      </main>
+    </>
   );
 }
