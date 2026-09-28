@@ -18,20 +18,30 @@ export default async function AdminLayout({
             <span className="block text-[15px] font-extrabold text-brand-ink">{PORTAL_NAME_LINE1}</span>
             <span className="block text-[12px] font-medium text-gray-400">{PORTAL_NAME_LINE2}</span>
           </Link>
-          {loggedIn && (
-            <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-sm font-bold text-white" aria-hidden>
-                운
-              </span>
-              <span className="hidden text-sm font-semibold text-brand-ink sm:inline">운영마스터</span>
-              <span className="rounded-full bg-brand-light px-2 py-0.5 text-[11px] font-bold text-brand">
-                마스터
-              </span>
+          <div className="flex items-center gap-3">
+            {loggedIn && (
+              <>
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-sm font-bold text-white" aria-hidden>
+                  운
+                </span>
+                <span className="hidden text-sm font-semibold text-brand-ink sm:inline">운영마스터</span>
+                <span className="rounded-full bg-brand-light px-2 py-0.5 text-[11px] font-bold text-brand">
+                  마스터
+                </span>
+              </>
+            )}
+            <Link
+              href="/"
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-[13px] font-semibold text-gray-600 hover:border-brand hover:text-brand"
+            >
+              홈으로
+            </Link>
+            {loggedIn && (
               <form action={logoutAction}>
                 <button className="text-sm text-gray-400 hover:text-brand-ink">나가기</button>
               </form>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         {loggedIn && (
           <nav className="mx-auto flex max-w-5xl gap-5 px-4 pb-2.5 text-[13px] font-semibold text-gray-500">
