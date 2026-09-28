@@ -20,6 +20,7 @@ export function buildColumns(schema: FormSchema, rows: Answers[]): ExportColumn[
   const columns: ExportColumn[] = [];
 
   for (const field of schema) {
+    if (field.block === "heading") continue; // 표시 전용 — 열 없음
     if (field.block === "repeat_group") {
       const rg = field as RepeatGroupField;
       const label = rg.itemLabel ?? rg.label;

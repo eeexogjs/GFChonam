@@ -14,6 +14,7 @@ export interface TopicPayload {
   description: string;
   deadline: string; // "YYYY-MM-DDTHH:mm" (Asia/Seoul) 또는 ""
   perPersonLimit: number | null;
+  capacity: number | null; // 정원 — 도달 시 자동 마감
   schema: FormSchema;
 }
 
@@ -57,6 +58,7 @@ export default function TopicBuilder({
       description: "",
       deadline: "",
       perPersonLimit: null,
+      capacity: null,
       schema: [],
     }
   );
@@ -83,6 +85,7 @@ export default function TopicBuilder({
         description: t.notice,
         deadline: "",
         perPersonLimit: t.perPersonLimit,
+        capacity: null,
         schema,
       });
     }
@@ -184,7 +187,8 @@ export default function TopicBuilder({
           )}
           <FormRenderer
             schema={schema}
-            submitLabel="제 출 하 기"
+            submitLabel="신청 접수하기"
+            stickySubmit={false}
             action={async () => ({ ok: false as const, message: "미리보기 모드입니다 — 실제로 제출되지 않습니다." })}
           />
         </div>
@@ -227,10 +231,16 @@ export default function TopicBuilder({
                   value={payload.deadline} onChange={(e) => set({ deadline: e.target.value })} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">인당 한도 (비우면 무제한)</label>
+                <label className="mb-1 block text-xs font-medium text-gray-500">인당 접수 한도 (비우면 무제한)</label>
                 <input type="number" min={1} className={inputCls} placeholder="예: 3"
                   value={payload.perPersonLimit ?? ""}
                   onChange={(e) => set({ perPersonLimit: e.target.value ? Number(e.target.value) : null })} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500">정원 (도달 시 자동 마감, 비우면 무제한)</label>
+                <input type="number" min={1} className={inputCls} placeholder="예: 100"
+                  value={payload.capacity ?? ""}
+                  onChange={(e) => set({ capacity: e.target.value ? Number(e.target.value) : null })} />
               </div>
             </div>
           </section>

@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import BrandHeader from "@/components/BrandHeader";
+import RulesSummary from "@/components/RulesSummary";
 import FormRenderer from "@/components/form/FormRenderer";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { FormSchema } from "@/lib/form-schema";
@@ -13,16 +15,17 @@ interface TopicRow {
   description: string | null;
   status: "open" | "closed";
   deadline: string | null;
+  capacity: number | null;
+  per_person_limit: number | null;
   form_schema: FormSchema;
 }
 
 async function getTopic(slug: string) {
   // closed 주제도 "마감 안내"를 보여줘야 하므로 admin 클라이언트로 조회
-  // (anon RLS는 closed 주제를 아예 숨긴다 — 제출 API 쪽 안전장치)
   const admin = createAdminClient();
   const { data } = await admin
     .from("topics")
-    .select("id, title, description, status, deadline, form_schema")
+    .select("id, title, description, status, deadline, capacity, per_person_limit, form_schema")
     .eq("slug", slug)
     .single<TopicRow>();
   return data;
@@ -36,13 +39,12 @@ export async function generateMetadata({
   const { slug } = await params;
   const topic = await getTopic(slug);
   if (!topic) return { title: "취합ON" };
-  // 카톡 미리보기(OG)에 주제 제목이 뜨게 한다 — 클릭률에 직결
   return {
     title: `${topic.title} | 취합ON`,
-    description: topic.description ?? "취합ON 신청 페이지",
+    description: "아래 링크에서 1분 안에 신청을 완료하세요.",
     openGraph: {
       title: topic.title,
-      description: topic.description ?? "아래 링크에서 신청해주세요.",
+      description: "탭 한 번으로 신청 — 취합ON",
     },
   };
 }
@@ -61,44 +63,60 @@ export default async function TopicPage({
     (topic.deadline !== null && new Date(topic.deadline) <= new Date());
 
   return (
-    <main className="mx-auto max-w-md px-4 py-8 pb-16">
-      <header className="mb-6">
-        <h1 className="text-xl font-bold text-brand">{topic.title}</h1>
-        {topic.description && (
-          <div className="mt-3 whitespace-pre-wrap rounded-lg border-l-4 border-red-300 bg-red-50 px-3 py-2.5 text-sm text-gray-700">
-            {topic.description}
-          </div>
-        )}
-        {topic.deadline && !closed && (
-          <p className="mt-2 text-xs text-gray-500">
-            마감:{" "}
-            {new Date(topic.deadline).toLocaleString("ko-KR", {
-              timeZone: "Asia/Seoul",
-              month: "long",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </p>
-        )}
-      </header>
+    <>
+      <BrandHeader />
+      {/* 모바일: 한 열 / PC: 입력 영역 + 접수 규칙 요약 2열 */}
+      <main className="mx-auto max-w-md px-5 py-6 lg:max-w-4xl lg:py-10">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10">
+          <div className="min-w-0">
+            <h1 className="text-[23px] font-extrabold leading-snug text-brand-ink lg:text-[26px]">
+              {topic.title}
+            </h1>
 
-      {closed ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-          <p className="text-lg font-semibold text-gray-700">마감되었습니다</p>
-          <p className="mt-2 text-sm text-gray-500">
-            신청 기간이 종료되었습니다.
-            <br />
-            문의사항은 담당자에게 연락해주세요.
-          </p>
+            {topic.description && (
+              <div className="mt-3 whitespace-pre-wrap rounded-2xl bg-amber-50 px-4 py-3.5 text-[13.5px] leading-relaxed text-amber-900">
+                {topic.description}
+              </div>
+            )}
+
+            {/* 접수 규칙 — 모바일에서는 안내문 아래, PC에서는 우측 패널 */}
+            {!closed && (
+              <div className="lg:hidden">
+                <RulesSummary topic={topic} schema={topic.form_schema} variant="inline" />
+              </div>
+            )}
+
+            <div className="mt-6">
+              {closed ? (
+                <div className="card px-6 py-10 text-center">
+                  <p className="text-4xl" aria-hidden>🔒</p>
+                  <p className="mt-3 text-lg font-bold text-brand-ink">접수가 마감되었습니다</p>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-500">
+                    신청 기간이 종료되었어요.
+                    <br />
+                    궁금한 점은 담당자에게 문의해주세요.
+                  </p>
+                </div>
+              ) : (
+                <FormRenderer
+                  schema={topic.form_schema}
+                  submitLabel="입력 내용 확인하기"
+                  action={submitAnswers.bind(null, slug)}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* PC 우측: 접수 규칙 고정 패널 */}
+          {!closed && (
+            <aside className="hidden lg:block">
+              <div className="sticky top-8">
+                <RulesSummary topic={topic} schema={topic.form_schema} variant="card" />
+              </div>
+            </aside>
+          )}
         </div>
-      ) : (
-        <FormRenderer
-          schema={topic.form_schema}
-          submitLabel="제 출 하 기"
-          action={submitAnswers.bind(null, slug)}
-        />
-      )}
-    </main>
+      </main>
+    </>
   );
 }

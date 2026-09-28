@@ -1,10 +1,38 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 카카오 인앱브라우저에서 iOS 확대 방지: 입력 폰트 16px 이상 유지 */
+/* 카카오 인앱브라우저 iOS 자동확대 방지: 입력 폰트 16px 이상 유지 */
 input,
 select,
 textarea {
   font-size: 16px;
+}
+
+@layer components {
+  /* 입력 공통 */
+  .field-input {
+    @apply w-full rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-gray-900 outline-none transition-all placeholder:text-gray-300;
+  }
+  .field-input:focus {
+    @apply border-brand ring-2 ring-brand/15;
+  }
+  .field-input-error {
+    @apply border-red-400 ring-2 ring-red-100;
+  }
+
+  /* 카드 */
+  .card {
+    @apply rounded-2xl border border-gray-100 bg-white p-4 shadow-card;
+  }
+
+  /* 버튼 */
+  .btn-primary {
+    @apply rounded-xl bg-brand font-semibold text-white transition-all active:scale-[0.99] disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply rounded-xl border border-brand/30 font-medium text-brand transition-colors hover:bg-brand-light;
+  }
 }

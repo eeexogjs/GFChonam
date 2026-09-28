@@ -14,57 +14,84 @@ export function FieldShell({
   label,
   required,
   error,
+  hint,
   children,
 }: {
   path: string;
   label: string;
   required?: boolean;
   error?: string;
+  hint?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div id={`f-${path}`} className="mb-4 scroll-mt-24">
-      <label className="mb-1 block text-sm font-medium text-gray-700">
+    <div id={`f-${path}`} className="mb-4 scroll-mt-28">
+      <label className="mb-1.5 block text-[13px] font-semibold text-gray-600">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-brand">*</span>}
       </label>
       {children}
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {hint && !error && <div className="mt-1.5 text-xs">{hint}</div>}
+      {error && (
+        <p className="mt-1.5 flex items-start gap-1 text-xs font-medium text-red-500">
+          <span aria-hidden>⚠</span> {error}
+        </p>
+      )}
     </div>
   );
 }
 
 const inputCls = (error?: string) =>
-  `w-full rounded-lg border bg-white px-3 py-2.5 outline-none transition-colors focus:border-brand ${
-    error ? "border-red-400" : "border-gray-300"
-  }`;
+  `field-input ${error ? "field-input-error" : ""}`;
 
 export function TextInput({
   field,
   path,
   value,
   error,
+  hint,
   onChange,
+  onBlur,
+  sameAsChecked,
+  onToggleSameAs,
 }: {
   field: TextField;
   path: string;
   value: string;
   error?: string;
+  hint?: React.ReactNode;
   onChange: (v: string) => void;
+  onBlur?: (v: string) => void;
+  /** "신청자와 같습니다" 체크 상태 (sameAsRole 필드에만 전달됨) */
+  sameAsChecked?: boolean;
+  onToggleSameAs?: (checked: boolean) => void;
 }) {
   const numeric = field.pattern?.includes("[0-9]") || field.pattern?.includes("\\d");
   return (
-    <FieldShell path={path} label={field.label} required={field.required} error={error}>
+    <FieldShell path={path} label={field.label} required={field.required} error={error} hint={hint}>
+      {onToggleSameAs && (
+        <label className="mb-1.5 flex items-center gap-1.5 text-[13px] text-gray-600">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-brand"
+            checked={!!sameAsChecked}
+            onChange={(e) => onToggleSameAs(e.target.checked)}
+          />
+          {field.sameAsLabel ?? "신청자와 같습니다"}
+        </label>
+      )}
       <input
         type="text"
         inputMode={numeric ? "numeric" : "text"}
-        className={inputCls(error)}
+        className={inputCls(error) + (sameAsChecked ? " bg-gray-50 text-gray-500" : "")}
         placeholder={field.placeholder}
         maxLength={field.maxLength}
         value={value ?? ""}
+        readOnly={!!sameAsChecked}
         onChange={(e) =>
           onChange(numeric ? e.target.value.replace(/[^0-9]/g, "") : e.target.value)
         }
+        onBlur={(e) => onBlur?.(e.target.value)}
       />
     </FieldShell>
   );
@@ -86,13 +113,13 @@ export function SelectInput({
   return (
     <FieldShell path={path} label={field.label} required={field.required} error={error}>
       <select
-        className={inputCls(error)}
+        className={inputCls(error) + (value ? "" : " text-gray-400")}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
       >
-        <option value="">-- 선택 --</option>
+        <option value="">선택해주세요</option>
         {field.options.map((o) => (
-          <option key={o} value={o}>
+          <option key={o} value={o} className="text-gray-900">
             {o}
           </option>
         ))}
@@ -101,7 +128,26 @@ export function SelectInput({
   );
 }
 
-/** 010 고정 3분할 — 값은 "010-1234-5678" 문자열로 합쳐서 저장 */
+/**
+ * 연락처 — 휴대전화(010)와 지역번호(02, 062 등)를 모두 받는 단일 입력.
+ * 숫자만 입력하면 하이픈이 자동으로 들어간다. 값은 "010-1234-5678" 형태로 저장.
+ */
+export function formatPhone(raw: string): string {
+  const d = raw.replace(/[^0-9]/g, "").slice(0, 11);
+  if (d.startsWith("02")) {
+    // 서울 국번: 02 + 3~4자리 + 4자리
+    if (d.length <= 2) return d;
+    if (d.length <= 5) return `02-${d.slice(2)}`;
+    if (d.length <= 9) return `02-${d.slice(2, 5)}-${d.slice(5, 9)}`;
+    return `02-${d.slice(2, 6)}-${d.slice(6, 10)}`;
+  }
+  // 그 외: 3자리 식별번호 + 3~4자리 + 4자리
+  if (d.length <= 3) return d;
+  if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`;
+  if (d.length <= 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6, 10)}`;
+  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7, 11)}`;
+}
+
 export function PhoneInput({
   field,
   path,
@@ -115,42 +161,16 @@ export function PhoneInput({
   error?: string;
   onChange: (v: string) => void;
 }) {
-  const [, mid = "", last = ""] = (value ?? "").split("-");
-  const lastRef = useRef<HTMLInputElement>(null);
-
-  const set = (m: string, l: string) => {
-    onChange(m || l ? `010-${m}-${l}` : "");
-  };
-
   return (
     <FieldShell path={path} label={field.label} required={field.required} error={error}>
-      <div className="flex items-center gap-2">
-        <span className="rounded-lg border border-gray-200 bg-gray-100 px-3 py-2.5 text-gray-600">
-          010
-        </span>
-        <input
-          type="text"
-          inputMode="numeric"
-          maxLength={4}
-          className={inputCls(error) + " text-center"}
-          value={mid}
-          onChange={(e) => {
-            const v = e.target.value.replace(/[^0-9]/g, "");
-            set(v, last);
-            if (v.length === 4) lastRef.current?.focus();
-          }}
-        />
-        <span className="text-gray-400">-</span>
-        <input
-          ref={lastRef}
-          type="text"
-          inputMode="numeric"
-          maxLength={4}
-          className={inputCls(error) + " text-center"}
-          value={last}
-          onChange={(e) => set(mid, e.target.value.replace(/[^0-9]/g, ""))}
-        />
-      </div>
+      <input
+        type="tel"
+        inputMode="numeric"
+        className={inputCls(error)}
+        placeholder="010-1234-5678 (지역번호 가능)"
+        value={value ?? ""}
+        onChange={(e) => onChange(formatPhone(e.target.value))}
+      />
     </FieldShell>
   );
 }
@@ -194,24 +214,30 @@ export function CheckboxInput({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div id={`f-${path}`} className="mb-4 scroll-mt-24">
-      <label className="flex items-center gap-2 text-sm text-gray-700">
+    <div id={`f-${path}`} className="mb-4 scroll-mt-28">
+      <label className="flex items-center gap-2.5 rounded-xl border border-gray-200 bg-white px-3.5 py-3">
         <input
           type="checkbox"
-          className="h-4 w-4 accent-brand"
+          className="h-5 w-5 accent-brand"
           checked={!!value}
           onChange={(e) => onChange(e.target.checked)}
         />
-        {field.label}
-        {field.required && <span className="text-red-500">*</span>}
+        <span className="text-[15px] text-gray-700">
+          {field.label}
+          {field.required && <span className="ml-0.5 text-brand">*</span>}
+        </span>
       </label>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && (
+        <p className="mt-1.5 flex items-start gap-1 text-xs font-medium text-red-500">
+          <span aria-hidden>⚠</span> {error}
+        </p>
+      )}
     </div>
   );
 }
 
 /**
- * 다음(카카오) 우편번호 검색 — 팝업이 아닌 "임베드 모드"를 쓴다.
+ * 다음(카카오) 우편번호 검색 — 팝업이 아닌 "임베드 모드".
  * 카카오톡 인앱브라우저는 window.open 팝업이 차단/이탈되는 경우가 있어
  * 페이지 안에 검색 레이어를 펼치는 방식이 안전하다.
  */
@@ -240,7 +266,7 @@ function loadPostcodeScript(): Promise<void> {
     const s = document.createElement("script");
     s.src = POSTCODE_SRC;
     s.onload = () => resolve();
-    s.onerror = () => reject(new Error("우편번호 서비스를 불러오지 못했습니다."));
+    s.onerror = () => reject(new Error("주소 검색을 불러오지 못했습니다. 잠시 후 다시 시도해주세요."));
     document.head.appendChild(s);
   });
 }
@@ -296,7 +322,7 @@ export function AddressInput({
         <input
           type="text"
           readOnly
-          className={inputCls(error) + " flex-1 bg-gray-50"}
+          className={inputCls(error) + " flex-1 cursor-pointer bg-gray-50"}
           placeholder="주소 검색을 눌러주세요"
           value={v.address ? `${v.address} (${v.postcode})` : ""}
           onClick={() => setOpen(true)}
@@ -304,21 +330,21 @@ export function AddressInput({
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="shrink-0 rounded-lg bg-gray-800 px-4 py-2.5 text-sm text-white"
+          className="shrink-0 rounded-xl bg-brand-ink px-4 py-3 text-sm font-medium text-white"
         >
-          {open ? "닫기" : "검색"}
+          {open ? "닫기" : "주소 검색"}
         </button>
       </div>
       {open && (
         <div
           ref={embedRef}
-          className="mt-2 h-[420px] w-full overflow-hidden rounded-lg border border-gray-300"
+          className="mt-2 h-[420px] w-full overflow-hidden rounded-xl border border-gray-200"
         />
       )}
       <input
         type="text"
         className={inputCls(undefined) + " mt-2"}
-        placeholder="상세주소 입력"
+        placeholder="상세주소 (동·호수 등)"
         value={v.detail}
         onChange={(e) => onChange({ ...v, detail: e.target.value })}
       />

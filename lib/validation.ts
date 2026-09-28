@@ -14,7 +14,8 @@ import type {
 
 export type FieldErrors = Record<string, string>;
 
-const PHONE_RE = /^010-\d{3,4}-\d{4}$/;
+// 휴대전화(010 등)와 지역번호(02, 062 등) 모두 허용
+const PHONE_RE = /^(02-\d{3,4}-\d{4}|0\d{2}-\d{3,4}-\d{4})$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function validateSimple(field: SimpleField, value: unknown, path: string, errors: FieldErrors) {
@@ -45,7 +46,7 @@ function validateSimple(field: SimpleField, value: unknown, path: string, errors
     }
     case "phone": {
       if (!PHONE_RE.test(String(value)))
-        errors[path] = "연락처를 정확히 입력해주세요. (예: 010-1234-5678)";
+        errors[path] = "연락처를 확인해주세요. (예: 010-1234-5678 또는 062-123-4567)";
       break;
     }
     case "date": {
@@ -67,6 +68,7 @@ export function validateAnswers(schema: FormSchema, answers: Answers): FieldErro
   const errors: FieldErrors = {};
 
   for (const field of schema as FieldBlock[]) {
+    if (field.block === "heading") continue; // 표시 전용 블록
     if (field.block === "repeat_group") {
       const items = Array.isArray(answers[field.id])
         ? (answers[field.id] as Record<string, unknown>[])

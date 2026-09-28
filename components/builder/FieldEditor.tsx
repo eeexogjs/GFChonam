@@ -10,6 +10,7 @@ import type {
 } from "@/lib/form-schema";
 
 export const BLOCK_LABELS: Record<string, string> = {
+  heading: "섹션 제목",
   text: "텍스트",
   select: "선택목록",
   phone: "전화번호",
@@ -82,24 +83,26 @@ export default function FieldEditor({
         </p>
       )}
 
-      {/* 공통: 라벨 + 필수 */}
+      {/* 공통: 라벨 + 필수 (섹션 제목은 필수 개념 없음) */}
       <div className="flex items-center gap-2">
         <input
           type="text"
           className={smallInput}
-          placeholder="항목 이름 (예: 발송인 이름)"
+          placeholder={field.block === "heading" ? "섹션 제목 (예: 발송인 정보)" : "항목 이름 (예: 발송인 이름)"}
           value={field.label}
           onChange={(e) => set({ label: e.target.value })}
         />
-        <label className="flex shrink-0 items-center gap-1 text-xs text-gray-600">
-          <input
-            type="checkbox"
-            className="accent-brand"
-            checked={!!field.required}
-            onChange={(e) => set({ required: e.target.checked })}
-          />
-          필수
-        </label>
+        {field.block !== "heading" && (
+          <label className="flex shrink-0 items-center gap-1 text-xs text-gray-600">
+            <input
+              type="checkbox"
+              className="accent-brand"
+              checked={!!field.required}
+              onChange={(e) => set({ required: e.target.checked })}
+            />
+            필수
+          </label>
+        )}
       </div>
 
       {/* 타입별 옵션 */}

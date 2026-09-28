@@ -26,9 +26,9 @@ export default function CopyLinkButton({ text, label }: { text: string; label: s
     <button
       type="button"
       onClick={copy}
-      className="w-full rounded-xl border border-brand py-3 font-medium text-brand"
+      className="btn-ghost w-full py-3.5"
     >
-      {copied ? "복사되었습니다 ✓" : label}
+      {copied ? "✓ 복사 완료! 카톡에 붙여넣으세요" : label}
     </button>
   );
 }
