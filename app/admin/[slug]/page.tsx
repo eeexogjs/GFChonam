@@ -5,7 +5,8 @@ import { getSiteUrl } from "@/lib/site-url";
 import type { Answers, FormSchema } from "@/lib/form-schema";
 import { buildColumns, formatSeoulTime } from "@/lib/export-columns";
 import CopyLinkButton from "@/components/CopyLinkButton";
-import { softDeleteSubmission, toggleTopicStatus } from "../actions";
+import { STATUS_LABEL } from "@/lib/labels";
+import { setTopicStatus, softDeleteSubmission } from "../actions";
 
 export const revalidate = 0;
 
@@ -76,6 +77,8 @@ export default async function AdminTopicPage({
   const siteUrl = await getSiteUrl();
   const shareUrl = `${siteUrl}/${topic.slug}`;
   const isOpen = topic.status === "open";
+  const isDraft = topic.status === "draft";
+  const statusBadge = STATUS_LABEL[topic.status] ?? STATUS_LABEL.closed;
   const qrDataUrl = await QRCode.toDataURL(shareUrl, { width: 220, margin: 1, color: { dark: "#0D1B3A" } });
 
   return (
@@ -86,8 +89,8 @@ export default async function AdminTopicPage({
           <div>
             <h1 className="text-lg font-bold text-brand-ink">{topic.title}</h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-              <span className={`rounded-full px-2 py-0.5 font-semibold ${isOpen ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-500"}`}>
-                {isOpen ? "접수중" : "마감"}
+              <span className={`rounded-full px-2 py-0.5 font-semibold ${statusBadge.cls}`}>
+                {statusBadge.text}
               </span>
               <span className="rounded-full bg-gray-100 px-2 py-0.5 font-mono text-gray-500">/{topic.slug}</span>
               {topic.deadline && (
@@ -112,14 +115,19 @@ export default async function AdminTopicPage({
             <a href={`/admin/${slug}/export`} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">
               엑셀 다운로드
             </a>
-            <form action={toggleTopicStatus.bind(null, slug)}>
+            <form action={setTopicStatus.bind(null, slug, isOpen ? ("closed" as const) : ("open" as const))}>
               <button className={`rounded-xl px-4 py-2 text-sm font-semibold text-white ${isOpen ? "bg-gray-500" : "bg-brand"}`}>
-                {isOpen ? "마감하기" : "다시 열기"}
+                {isDraft ? "공개하기" : isOpen ? "마감하기" : "다시 열기"}
               </button>
             </form>
           </div>
         </div>
 
+        {isDraft && (
+          <p className="mt-3 rounded-xl bg-amber-50 px-3.5 py-2.5 text-[13px] text-amber-800">
+            아직 <b>초안</b>이에요 — 양식을 확인한 뒤 <b>[공개하기]</b>를 누르면 신청을 받기 시작합니다. 공개 전에는 링크를 열어도 신청할 수 없어요.
+          </p>
+        )}
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <div className="flex-1">
             <CopyLinkButton
