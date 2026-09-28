@@ -8,15 +8,22 @@ export default function AdminLoginPage() {
 
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-sm flex-col justify-center px-4">
-      <h1 className="mb-1 text-center text-2xl font-bold text-brand">취합ON 관리자</h1>
-      <p className="mb-6 text-center text-sm text-gray-500">마스터 비밀번호를 입력하세요</p>
+      <h1 className="mb-1 text-center text-2xl font-bold text-brand-ink">관리자 로그인</h1>
+      <p className="mb-6 text-center text-sm text-gray-500">등록된 관리자만 접근할 수 있어요</p>
 
-      <form action={formAction} className="space-y-3">
+      <form action={formAction} className="space-y-2.5">
         <input
-          type="password"
-          name="password"
+          type="text"
+          name="name"
           autoFocus
-          placeholder="비밀번호"
+          placeholder="성함"
+          className="field-input"
+        />
+        <input
+          type="text"
+          name="code"
+          inputMode="numeric"
+          placeholder="사번"
           className="field-input"
         />
         {state.error && (

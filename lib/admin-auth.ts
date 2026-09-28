@@ -34,3 +34,41 @@ export async function isValidSession(cookieValue: string | undefined): Promise<b
   const expected = await computeSessionToken();
   return expected !== null && cookieValue === expected;
 }
+
+/* ── 지점장 세션 ──────────────────────────────────────────
+ * 쿠키 값 = "지점명|HMAC(branch:지점명)". 관리자와 같은 키(ADMIN_PASSWORD)로
+ * 서명하므로 별도 비밀 관리가 없고, 위조하면 서명이 맞지 않아 거부된다.
+ */
+export const BRANCH_COOKIE = "chwihap_branch";
+
+async function hmacHex(message: string): Promise<string | null> {
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) return null;
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export async function computeBranchCookieValue(branch: string): Promise<string | null> {
+  const sig = await hmacHex(`branch:${branch}`);
+  return sig ? `${branch}|${sig}` : null;
+}
+
+/** 유효하면 지점명을, 아니면 null을 돌려준다 */
+export async function readBranchSession(cookieValue: string | undefined): Promise<string | null> {
+  if (!cookieValue) return null;
+  const idx = cookieValue.lastIndexOf("|");
+  if (idx <= 0) return null;
+  const branch = cookieValue.slice(0, idx);
+  const expected = await computeBranchCookieValue(branch);
+  return expected !== null && cookieValue === expected ? branch : null;
+}
