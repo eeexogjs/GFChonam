@@ -22,7 +22,7 @@ export default async function Home() {
 
   return (
     <>
-      <BrandHeader />
+      <BrandHeader showOperatorLinks />
       <main className="mx-auto max-w-md px-5 py-8">
         <h1 className="text-2xl font-extrabold leading-snug text-brand-ink">
           지금 진행 중인 접수
