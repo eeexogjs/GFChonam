@@ -13,7 +13,7 @@ interface TopicRow {
   id: string;
   title: string;
   description: string | null;
-  status: "draft" | "open" | "closed";
+  status: "open" | "closed";
   deadline: string | null;
   capacity: number | null;
   per_person_limit: number | null;
@@ -58,7 +58,6 @@ export default async function TopicPage({
   const topic = await getTopic(slug);
   if (!topic) notFound();
 
-  const isDraft = topic.status === "draft";
   const closed =
     topic.status !== "open" ||
     (topic.deadline !== null && new Date(topic.deadline) <= new Date());
@@ -88,17 +87,7 @@ export default async function TopicPage({
             )}
 
             <div className="mt-6">
-              {isDraft ? (
-                <div className="card px-6 py-10 text-center">
-                  <p className="text-4xl" aria-hidden>🕓</p>
-                  <p className="mt-3 text-lg font-bold text-brand-ink">아직 접수 시작 전이에요</p>
-                  <p className="mt-2 text-sm leading-relaxed text-gray-500">
-                    접수가 열리면 이 링크에서 바로 신청할 수 있어요.
-                    <br />
-                    시작 시점은 담당자 안내를 확인해주세요.
-                  </p>
-                </div>
-              ) : closed ? (
+              {closed ? (
                 <div className="card px-6 py-10 text-center">
                   <p className="text-4xl" aria-hidden>🔒</p>
                   <p className="mt-3 text-lg font-bold text-brand-ink">접수가 마감되었습니다</p>

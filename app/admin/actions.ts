@@ -41,84 +41,24 @@ export async function logoutAction() {
   redirect("/admin/login");
 }
 
-/** 상태 변경: 초안→공개(open), 공개→마감(closed), 마감→재개(open) */
-export async function setTopicStatus(slug: string, status: "open" | "closed") {
+/** 마감 ↔ 재개 토글 */
+export async function toggleTopicStatus(slug: string) {
   const admin = createAdminClient();
-  await admin.from("topics").update({ status }).eq("slug", slug);
+  const { data: topic } = await admin
+    .from("topics")
+    .select("id, status")
+    .eq("slug", slug)
+    .single();
+  if (!topic) return;
+
+  await admin
+    .from("topics")
+    .update({ status: topic.status === "open" ? "closed" : "open" })
+    .eq("id", topic.id);
+
   revalidatePath(`/admin/${slug}`);
   revalidatePath("/admin");
   revalidatePath(`/${slug}`);
-}
-
-/** 취합 복제 — 양식·설정을 복사해 "초안"으로 생성 (응답은 복사하지 않음) */
-export async function duplicateTopic(slug: string) {
-  const admin = createAdminClient();
-  const { data: src } = await admin
-    .from("topics")
-    .select("title, slug, type, description, form_schema, deadline, per_person_limit, capacity")
-    .eq("slug", slug)
-    .single();
-  if (!src) return;
-
-  // 겹치지 않는 slug 찾기: {원본}-copy, -copy2, ...
-  let newSlug = `${src.slug}-copy`;
-  for (let i = 2; i < 50; i++) {
-    const { data: exists } = await admin.from("topics").select("id").eq("slug", newSlug).maybeSingle();
-    if (!exists) break;
-    newSlug = `${src.slug}-copy${i}`;
-  }
-
-  const { error } = await admin.from("topics").insert({
-    title: `${src.title} (복사본)`,
-    slug: newSlug,
-    type: src.type,
-    description: src.description,
-    form_schema: src.form_schema,
-    deadline: null, // 마감일은 회차마다 다르므로 비워서 생성
-    per_person_limit: src.per_person_limit,
-    capacity: src.capacity,
-    status: "draft",
-  });
-  if (error) return;
-
-  revalidatePath("/admin");
-  redirect(`/admin/${newSlug}/edit`);
-}
-
-/** 지점 등록/갱신 — "지점명,설계사수" 줄 텍스트 일괄 반영 (지점장 모드 제출률의 분모) */
-export async function saveBranches(
-  _prev: { message?: string; error?: string },
-  formData: FormData
-): Promise<{ message?: string; error?: string }> {
-  const raw = formData.get("rows");
-  if (typeof raw !== "string" || !raw.trim()) return { error: "입력된 내용이 없습니다." };
-
-  const rows: { name: string; headcount: number; active: boolean }[] = [];
-  const bad: number[] = [];
-  raw.split("\n").forEach((line, i) => {
-    const t = line.trim();
-    if (!t) return;
-    const [name, cnt] = t.split(/[,\t]/).map((s) => s.trim());
-    const headcount = Number(cnt);
-    if (!name || !Number.isInteger(headcount) || headcount < 0) {
-      bad.push(i + 1);
-      return;
-    }
-    rows.push({ name, headcount, active: true });
-  });
-
-  if (rows.length === 0)
-    return { error: `등록할 수 있는 줄이 없습니다. "지점명,설계사수" 형식인지 확인해주세요.` };
-
-  const admin = createAdminClient();
-  const { error } = await admin.from("branches").upsert(rows, { onConflict: "name" });
-  if (error) return { error: "저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." };
-
-  revalidatePath("/admin/branches");
-  revalidatePath("/manager");
-  return {
-    message: `${rows.length}개 지점 등록/갱신 완료${bad.length ? ` · 형식 오류 ${bad.length}줄 건너뜀(${bad.slice(0, 5).join(", ")}행)` : ""}`,
-  };
 }
 
 /**
@@ -145,8 +85,7 @@ export async function saveTopic(
   };
 
   if (originalSlug === null) {
-    // 새 취합은 "초안"으로 생성 — 상세 화면에서 [공개하기]를 눌러야 노출된다
-    const { error: dbError } = await admin.from("topics").insert({ ...row, status: "draft" });
+    const { error: dbError } = await admin.from("topics").insert(row);
     if (dbError) {
       return {
         ok: false,

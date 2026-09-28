@@ -75,31 +75,6 @@ export default async function Home() {
             </ul>
           )}
         </div>
-
-        {/* 관리자·지점장 진입 — 일반 신청자 동선을 방해하지 않게 하단에 배치 */}
-        <section className="mt-10 border-t border-gray-200 pt-6">
-          <p className="mb-3 text-center text-xs font-medium text-gray-400">
-            운영자이신가요?
-          </p>
-          <div className="grid grid-cols-2 gap-2.5">
-            <Link
-              href="/admin"
-              className="card flex flex-col items-center gap-1 py-4 text-center transition-all hover:border-brand/40"
-            >
-              <span className="text-xl" aria-hidden>🔑</span>
-              <span className="text-sm font-bold text-brand-ink">관리자 모드</span>
-              <span className="text-[11px] text-gray-400">접수 개설 · 취합 · 엑셀</span>
-            </Link>
-            <Link
-              href="/manager"
-              className="card flex flex-col items-center gap-1 py-4 text-center transition-all hover:border-brand/40"
-            >
-              <span className="text-xl" aria-hidden>📊</span>
-              <span className="text-sm font-bold text-brand-ink">지점장 모드</span>
-              <span className="text-[11px] text-gray-400">우리 지점 현황</span>
-            </Link>
-          </div>
-        </section>
       </main>
     </>
   );
