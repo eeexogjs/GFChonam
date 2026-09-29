@@ -31,7 +31,7 @@ export function buildRules(topic: TopicRules, schema: FormSchema) {
           hour: "2-digit",
           minute: "2-digit",
         })} 마감`
-      : "마감 시까지 (별도 공지)",
+      : "마감일 미정 (마감 시 별도 공지)",
   });
   rules.push({
     label: "신청 횟수",
@@ -42,6 +42,13 @@ export function buildRules(topic: TopicRules, schema: FormSchema) {
       label: `1회 ${rg.itemLabel ?? "항목"} 입력`,
       value: `최대 ${rg.maxItems ?? 1}명`,
     });
+    // 횟수 × 1회 인원의 총량을 명시해 "몇 명까지 가능한지" 오해가 없게 한다
+    if (topic.per_person_limit && rg.maxItems) {
+      rules.push({
+        label: "1인 최대 인원",
+        value: `총 ${topic.per_person_limit * rg.maxItems}명까지 (${topic.per_person_limit}회 × ${rg.maxItems}명)`,
+      });
+    }
   }
   if (topic.capacity) {
     rules.push({ label: "전체 정원", value: `선착순 ${topic.capacity}건 (마감 시 자동 종료)` });

@@ -180,6 +180,7 @@ export async function saveTopic(
     per_person_limit: payload.perPersonLimit,
     capacity: payload.capacity,
     form_schema: payload.schema,
+    invite: payload.invite ?? null,
   };
 
   if (originalSlug === null) {

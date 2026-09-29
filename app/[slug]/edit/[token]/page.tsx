@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import BrandHeader from "@/components/BrandHeader";
 import FormRenderer from "@/components/form/FormRenderer";
 import { createAdminClient } from "@/lib/supabase/server";
+import { applyBranchOptions, fetchBranchNames } from "@/lib/branch-options";
 import type { Answers, FormSchema } from "@/lib/form-schema";
 import { updateAnswers } from "../../actions";
 
@@ -37,6 +38,9 @@ export default async function EditPage({
     topic.status !== "open" ||
     (topic.deadline !== null && new Date(topic.deadline) <= new Date());
 
+  // 신청 화면과 동일하게, 등록된 지점 목록을 "지점" 선택지로 주입
+  const schema = applyBranchOptions(topic.form_schema, await fetchBranchNames(admin));
+
   return (
     <>
       <BrandHeader />
@@ -55,7 +59,7 @@ export default async function EditPage({
             </div>
           ) : (
             <FormRenderer
-              schema={topic.form_schema}
+              schema={schema}
               initialAnswers={submission.answers as Answers}
               submitLabel="수정 완료하기"
               action={updateAnswers.bind(null, slug, token)}
