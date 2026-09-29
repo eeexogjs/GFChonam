@@ -4,6 +4,7 @@ import BrandHeader from "@/components/BrandHeader";
 import RulesSummary from "@/components/RulesSummary";
 import FormRenderer from "@/components/form/FormRenderer";
 import { createAdminClient } from "@/lib/supabase/server";
+import { applyBranchOptions, fetchBranchNames } from "@/lib/branch-options";
 import type { FormSchema } from "@/lib/form-schema";
 import { submitAnswers } from "./actions";
 
@@ -18,6 +19,7 @@ interface TopicRow {
   capacity: number | null;
   per_person_limit: number | null;
   form_schema: FormSchema;
+  info: { label: string; value: string }[] | null;
 }
 
 async function getTopic(slug: string) {
@@ -25,7 +27,7 @@ async function getTopic(slug: string) {
   const admin = createAdminClient();
   const { data } = await admin
     .from("topics")
-    .select("id, title, description, status, deadline, capacity, per_person_limit, form_schema")
+    .select("id, title, description, status, deadline, capacity, per_person_limit, form_schema, info")
     .eq("slug", slug)
     .single<TopicRow>();
   return data;
@@ -58,6 +60,10 @@ export default async function TopicPage({
   const topic = await getTopic(slug);
   if (!topic) notFound();
 
+  // 지점 관리에 등록된 지점을 "지점" 선택지로 주입 (등록이 없으면 스키마 원본 유지)
+  const branchNames = await fetchBranchNames(createAdminClient());
+  const schema = applyBranchOptions(topic.form_schema, branchNames);
+
   const isDraft = topic.status === "draft";
   const closed =
     topic.status !== "open" ||
@@ -74,6 +80,23 @@ export default async function TopicPage({
               {topic.title}
             </h1>
 
+            {/* 안내 정보 — 일시/장소/강사/택배사/비용 등, 신청 전 알아야 할 내용 */}
+            {topic.info && topic.info.length > 0 && (
+              <div className="card mt-4 border-brand/15">
+                <h2 className="mb-2.5 flex items-center gap-1.5 border-b border-gray-100 pb-2 text-sm font-bold text-brand-ink">
+                  <span aria-hidden>📌</span> 안내
+                </h2>
+                <dl className="space-y-2 text-[14px]">
+                  {topic.info.map((r) => (
+                    <div key={r.label} className="flex gap-3">
+                      <dt className="w-[86px] shrink-0 font-semibold text-brand">{r.label}</dt>
+                      <dd className="whitespace-pre-wrap leading-relaxed text-gray-700">{r.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+
             {topic.description && (
               <div className="mt-3 whitespace-pre-wrap rounded-2xl bg-amber-50 px-4 py-3.5 text-[13.5px] leading-relaxed text-amber-900">
                 {topic.description}
@@ -83,7 +106,7 @@ export default async function TopicPage({
             {/* 접수 규칙 — 모바일에서는 안내문 아래, PC에서는 우측 패널 */}
             {!closed && (
               <div className="lg:hidden">
-                <RulesSummary topic={topic} schema={topic.form_schema} variant="inline" />
+                <RulesSummary topic={topic} schema={schema} variant="inline" />
               </div>
             )}
 
@@ -110,7 +133,7 @@ export default async function TopicPage({
                 </div>
               ) : (
                 <FormRenderer
-                  schema={topic.form_schema}
+                  schema={schema}
                   submitLabel="입력 내용 확인하기"
                   action={submitAnswers.bind(null, slug)}
                 />
@@ -122,7 +145,7 @@ export default async function TopicPage({
           {!closed && (
             <aside className="hidden lg:block">
               <div className="sticky top-8">
-                <RulesSummary topic={topic} schema={topic.form_schema} variant="card" />
+                <RulesSummary topic={topic} schema={schema} variant="card" />
               </div>
             </aside>
           )}

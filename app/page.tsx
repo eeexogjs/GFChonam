@@ -54,18 +54,25 @@ export default async function Home() {
                         {TYPE_LABEL[t.type] ?? t.type}
                       </span>
                     </div>
-                    {t.deadline && (
-                      <p className="mt-2 text-xs text-gray-400">
-                        마감{" "}
-                        {new Date(t.deadline).toLocaleString("ko-KR", {
-                          timeZone: "Asia/Seoul",
-                          month: "long",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    )}
+                    {/* 상태 + 마감 — 신청서를 열기 전에 알 수 있게 */}
+                    <p className="mt-2 flex items-center gap-1.5 text-xs">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-bold text-emerald-600">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
+                        접수 중
+                      </span>
+                      <span className="text-gray-400">
+                        {t.deadline
+                          ? `${new Date(t.deadline).toLocaleString("ko-KR", {
+                              timeZone: "Asia/Seoul",
+                              month: "long",
+                              day: "numeric",
+                              weekday: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })} 마감`
+                          : "마감일 미정"}
+                      </span>
+                    </p>
                     <p className="mt-2.5 text-sm font-semibold text-brand">
                       신청하러 가기 →
                     </p>
@@ -75,6 +82,14 @@ export default async function Home() {
             </ul>
           )}
         </div>
+
+        {/* 접수증 링크를 잃어버린 사람의 자가 복구 진입점 */}
+        <Link
+          href="/my"
+          className="mt-5 block rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-3.5 text-center text-sm text-gray-500 transition-colors hover:border-brand hover:text-brand"
+        >
+          이미 신청하셨나요? <b className="font-semibold">내 접수 확인·수정하기</b> →
+        </Link>
       </main>
     </>
   );
