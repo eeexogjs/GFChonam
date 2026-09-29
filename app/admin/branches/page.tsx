@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import BranchesForm from "./BranchesForm";
+import DeleteBranchButton from "./DeleteBranchButton";
 
 export const revalidate = 0;
 
@@ -12,7 +13,7 @@ export default async function BranchesPage() {
   const admin = createAdminClient();
   const { data: branches } = await admin
     .from("branches")
-    .select("name, headcount, active")
+    .select("name, headcount, active, manager_name, manager_code")
     .order("name");
 
   return (
@@ -34,6 +35,8 @@ export default async function BranchesPage() {
                 <tr>
                   <th className="py-1">지점명</th>
                   <th className="py-1 text-right">설계사수</th>
+                  <th className="py-1 text-right">지점장</th>
+                  <th className="py-1 text-right" aria-label="삭제" />
                 </tr>
               </thead>
               <tbody>
@@ -41,6 +44,19 @@ export default async function BranchesPage() {
                   <tr key={b.name} className="border-t border-gray-50">
                     <td className="py-1.5 font-medium">{b.name}</td>
                     <td className="py-1.5 text-right">{b.headcount}명</td>
+                    <td className="py-1.5 text-right">
+                      {b.manager_name ? (
+                        <span className="text-xs font-semibold text-emerald-600">
+                          {b.manager_name}
+                          {b.manager_code && <span className="ml-1 font-mono text-gray-400">({b.manager_code})</span>}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-orange-400">미등록</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 pl-2 text-right">
+                      <DeleteBranchButton name={b.name} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

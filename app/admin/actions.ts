@@ -8,20 +8,30 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { deadlineToIso, validateTopicPayload } from "@/lib/topic-validation";
 import type { SaveResult, TopicPayload } from "@/components/builder/TopicBuilder";
 
-/** 로그인 — 성공 시 12시간짜리 httpOnly 세션 쿠키 발급 */
+/** 관리자 로그인 — 등록된 관리자(성함+사번)만 통과. 성공 시 12시간 httpOnly 세션 쿠키 */
 export async function loginAction(
   _prev: { error?: string },
   formData: FormData
 ): Promise<{ error?: string }> {
-  const password = formData.get("password");
-  const expected = process.env.ADMIN_PASSWORD;
+  const name = formData.get("name");
+  const code = formData.get("code");
+  if (typeof name !== "string" || !name.trim()) return { error: "성함을 입력해주세요." };
+  if (typeof code !== "string" || !code.trim()) return { error: "사번을 입력해주세요." };
 
-  if (!expected) {
-    return { error: "서버에 ADMIN_PASSWORD가 설정되지 않았습니다. Vercel 환경변수를 확인하세요." };
+  if (!process.env.ADMIN_PASSWORD) {
+    return { error: "서버에 ADMIN_PASSWORD(세션 서명키)가 설정되지 않았습니다. Vercel 환경변수를 확인하세요." };
   }
-  if (typeof password !== "string" || password !== expected) {
-    return { error: "비밀번호가 올바르지 않습니다." };
-  }
+
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("admins")
+    .select("code")
+    .eq("code", code.trim())
+    .eq("name", name.trim())
+    .eq("active", true)
+    .maybeSingle();
+
+  if (!data) return { error: "등록된 관리자 정보와 일치하지 않습니다." };
 
   const token = await computeSessionToken();
   const cookieStore = await cookies();
@@ -93,24 +103,44 @@ export async function saveBranches(
   const raw = formData.get("rows");
   if (typeof raw !== "string" || !raw.trim()) return { error: "입력된 내용이 없습니다." };
 
-  const rows: { name: string; headcount: number; active: boolean }[] = [];
+  const parsed: { name: string; headcount: number; managerName?: string; managerCode?: string }[] = [];
   const bad: number[] = [];
   raw.split("\n").forEach((line, i) => {
     const t = line.trim();
     if (!t) return;
-    const [name, cnt] = t.split(/[,\t]/).map((s) => s.trim());
+    const [name, cnt, mName, mCode] = t.split(/[,\t]/).map((s) => s.trim());
     const headcount = Number(cnt);
     if (!name || !Number.isInteger(headcount) || headcount < 0) {
       bad.push(i + 1);
       return;
     }
-    rows.push({ name, headcount, active: true });
+    parsed.push({
+      name,
+      headcount,
+      ...(mName ? { managerName: mName } : {}),
+      ...(mCode ? { managerCode: mCode } : {}),
+    });
   });
 
-  if (rows.length === 0)
-    return { error: `등록할 수 있는 줄이 없습니다. "지점명,설계사수" 형식인지 확인해주세요.` };
+  if (parsed.length === 0)
+    return { error: `등록할 수 있는 줄이 없습니다. "지점명,설계사수,지점장성함,지점장사번" 형식인지 확인해주세요.` };
 
   const admin = createAdminClient();
+  // 지점장 정보를 생략한 줄은 기존 값을 유지한다 (덮어쓰기 방지)
+  const { data: existing } = await admin
+    .from("branches")
+    .select("name, manager_name, manager_code");
+  const prev = new Map(
+    (existing ?? []).map((b) => [b.name, { n: b.manager_name as string | null, c: b.manager_code as string | null }])
+  );
+  const rows = parsed.map((r) => ({
+    name: r.name,
+    headcount: r.headcount,
+    active: true,
+    manager_name: r.managerName ?? prev.get(r.name)?.n ?? null,
+    manager_code: r.managerCode ?? prev.get(r.name)?.c ?? null,
+  }));
+
   const { error } = await admin.from("branches").upsert(rows, { onConflict: "name" });
   if (error) return { error: "저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." };
 
@@ -119,6 +149,14 @@ export async function saveBranches(
   return {
     message: `${rows.length}개 지점 등록/갱신 완료${bad.length ? ` · 형식 오류 ${bad.length}줄 건너뜀(${bad.slice(0, 5).join(", ")}행)` : ""}`,
   };
+}
+
+/** 지점 삭제 — 지점 행만 지운다. 제출 데이터는 지점명 텍스트로 남아 있으므로 영향 없음 */
+export async function deleteBranch(name: string) {
+  const admin = createAdminClient();
+  await admin.from("branches").delete().eq("name", name);
+  revalidatePath("/admin/branches");
+  revalidatePath("/manager");
 }
 
 /**
