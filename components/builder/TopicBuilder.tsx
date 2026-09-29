@@ -5,6 +5,7 @@ import FormRenderer from "@/components/form/FormRenderer";
 import FieldEditor, { BLOCK_LABELS } from "./FieldEditor";
 import { suggestSlug } from "@/lib/slug";
 import { TOPIC_TEMPLATES } from "@/lib/templates";
+import { EMPTY_INVITE, INVITE_TEMPLATES, GREETING_PRESETS, type InviteSettings } from "@/lib/invite";
 import type { FieldBlock, FormSchema } from "@/lib/form-schema";
 
 export interface TopicPayload {
@@ -16,6 +17,7 @@ export interface TopicPayload {
   perPersonLimit: number | null;
   capacity: number | null; // 정원 — 도달 시 자동 마감
   schema: FormSchema;
+  invite: InviteSettings | null; // 초대장 설정 (없으면 기능 꺼짐)
 }
 
 export type SaveResult = { ok: true; redirectTo: string } | { ok: false; message: string };
@@ -60,6 +62,7 @@ export default function TopicBuilder({
       perPersonLimit: null,
       capacity: null,
       schema: [],
+      invite: null,
     }
   );
   const [slugTouched, setSlugTouched] = useState(mode === "edit");
@@ -68,6 +71,8 @@ export default function TopicBuilder({
   const [pending, startTransition] = useTransition();
 
   const set = (patch: Partial<TopicPayload>) => setPayload((p) => ({ ...p, ...patch }));
+  const setInvite = (patch: Partial<InviteSettings>) =>
+    setPayload((p) => ({ ...p, invite: { ...(p.invite ?? EMPTY_INVITE), ...patch } }));
 
   const setTitle = (title: string) => {
     set({ title, ...(slugTouched ? {} : { slug: suggestSlug(title, payload.type) }) });
@@ -87,6 +92,7 @@ export default function TopicBuilder({
         perPersonLimit: t.perPersonLimit,
         capacity: null,
         schema,
+        invite: null,
       });
     }
     setStep("edit");
@@ -243,6 +249,83 @@ export default function TopicBuilder({
                   onChange={(e) => set({ capacity: e.target.value ? Number(e.target.value) : null })} />
               </div>
             </div>
+          </section>
+
+          {/* 초대장 설정 — 켜면 접수 완료 화면에서 설계사가 고객별 초대장 이미지를 만들 수 있다 */}
+          <section className="mb-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <label className="flex cursor-pointer items-center justify-between">
+              <span>
+                <span className="text-sm font-semibold text-gray-700">🎫 초대장 만들기 제공</span>
+                <span className="mt-0.5 block text-xs text-gray-400">
+                  켜면 신청 완료 화면에서 고객별 초대장 이미지를 만들어 카톡으로 보낼 수 있어요
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                className="h-5 w-5 accent-brand"
+                checked={payload.invite?.enabled ?? false}
+                onChange={(e) => setInvite({ enabled: e.target.checked })}
+              />
+            </label>
+
+            {payload.invite?.enabled && (
+              <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-500">디자인 템플릿</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {INVITE_TEMPLATES.map((t) => (
+                      <button key={t.key} type="button" onClick={() => setInvite({ template: t.key })}
+                        className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm ${
+                          (payload.invite?.template ?? "green") === t.key
+                            ? "border-brand bg-brand-light font-semibold text-brand"
+                            : "border-gray-300 text-gray-600"
+                        }`}>
+                        <span className="h-4 w-4 rounded-full border border-black/10" style={{ background: `linear-gradient(160deg, ${t.bgTop}, ${t.bgBottom})` }} />
+                        {t.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-500">행사명 (초대장에 크게 표시) *</label>
+                  <input type="text" className={inputCls} placeholder="예: VIP 자산관리 세미나"
+                    value={payload.invite.eventName}
+                    onChange={(e) => setInvite({ eventName: e.target.value })} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-500">일시 (자유 서식)</label>
+                    <input type="text" className={inputCls} placeholder="10월 16일(목) 오후 2시"
+                      value={payload.invite.dateText}
+                      onChange={(e) => setInvite({ dateText: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-500">장소</label>
+                    <input type="text" className={inputCls} placeholder="삼성생명 광주사옥 3층 대강당"
+                      value={payload.invite.placeText}
+                      onChange={(e) => setInvite({ placeText: e.target.value })} />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-500">기본 인사말 (설계사가 고객별로 수정 가능)</label>
+                  <textarea className={inputCls + " h-20"} value={payload.invite.greeting}
+                    onChange={(e) => setInvite({ greeting: e.target.value })} />
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {GREETING_PRESETS.map((g, i) => (
+                      <button key={i} type="button" onClick={() => setInvite({ greeting: g })}
+                        className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:border-brand hover:text-brand">
+                        추천 문구 {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-500">주최 표기 (하단)</label>
+                  <input type="text" className={inputCls} value={payload.invite.host}
+                    onChange={(e) => setInvite({ host: e.target.value })} />
+                </div>
+              </div>
+            )}
           </section>
 
           {/* 필드 목록 */}

@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import BrandHeader from "@/components/BrandHeader";
 import CopyLinkButton from "@/components/CopyLinkButton";
+import InviteMaker from "@/components/invite/InviteMaker";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getSiteUrl } from "@/lib/site-url";
+import { extractGuestNames, type InviteSettings } from "@/lib/invite";
 import {
   formatValue,
   type Answers,
@@ -30,7 +32,7 @@ export default async function DonePage({
   const admin = createAdminClient();
   const { data: submission } = await admin
     .from("submissions")
-    .select("answers, created_at, updated_at, topics!inner(title, slug, form_schema)")
+    .select("answers, created_at, updated_at, topics!inner(title, slug, form_schema, invite)")
     .eq("edit_token", token)
     .eq("topics.slug", slug)
     .is("deleted_at", null)
@@ -41,9 +43,12 @@ export default async function DonePage({
   const topic = submission.topics as unknown as {
     title: string;
     form_schema: FormSchema;
+    invite: InviteSettings | null;
   };
   const answers = submission.answers as Answers;
   const siteUrl = await getSiteUrl();
+  const invite = topic.invite?.enabled ? topic.invite : null;
+  const guestNames = invite ? extractGuestNames(topic.form_schema, answers) : [];
 
   return (
     <>
@@ -105,6 +110,9 @@ export default async function DonePage({
               ` · 수정 ${new Date(submission.updated_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`}
           </p>
         </section>
+
+        {/* 초대장 만들기 — 관리자가 이 취합에 초대장을 켠 경우에만 */}
+        {invite && <InviteMaker invite={invite} guestNames={guestNames} />}
 
         <div className="mt-5 space-y-2.5">
           <Link

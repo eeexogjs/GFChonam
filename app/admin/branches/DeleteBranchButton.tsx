@@ -15,7 +15,7 @@ export default function DeleteBranchButton({ name }: { name: string }) {
       type="button"
       disabled={pending}
       onClick={() => {
-        if (!window.confirm(`'${name}' 지점을 삭제할까요?\n해당 지점장 로그인도 함께 사용할 수 없게 됩니다.\n(제출된 신청 데이터는 삭제되지 않아요)`)) return;
+        if (!window.confirm(`'${name}' 지점을 삭제할까요?\n신청 화면의 지점 선택지에서 빠지고, 해당 지점장 로그인도 막힙니다.\n(제출된 신청 데이터는 삭제되지 않아요)`)) return;
         startTransition(() => deleteBranch(name));
       }}
       className="rounded-lg px-2 py-1 text-xs font-semibold text-red-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"

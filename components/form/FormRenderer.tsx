@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type {
   AddressValue,
   Answers,
+  FieldBlock,
   FormSchema,
   RepeatGroupField,
   SimpleField,
@@ -62,6 +63,19 @@ export default function FormRenderer({
   const [showConfirm, setShowConfirm] = useState(false);
   const [sameAs, setSameAs] = useState<Record<string, boolean>>({});
   const [pending, startTransition] = useTransition();
+
+  // 반복그룹 카드 추가 시 새 카드로 스크롤 + 첫 입력칸 포커스
+  const focusTarget = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusTarget.current) return;
+    const el = document.getElementById(focusTarget.current);
+    focusTarget.current = null;
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const input = el.querySelector<HTMLElement>("input, select, textarea");
+      setTimeout(() => input?.focus({ preventScroll: true }), 350);
+    }
+  }, [answers]);
 
   /** sameAsRole 필드의 원본 필드 id 찾기 (예: 발송인 이름 ← 신청자 이름) */
   const sourceIdOfRole = (role: string) =>
@@ -250,7 +264,11 @@ export default function FormRenderer({
         {items.length < max && (
           <button
             type="button"
-            onClick={() => set(field.id, [...items, {}] as Answers[string])}
+            onClick={() => {
+              const firstSub = field.fields[0]?.id;
+              if (firstSub) focusTarget.current = `f-${field.id}.${items.length}.${firstSub}`;
+              set(field.id, [...items, {}] as Answers[string]);
+            }}
             className="w-full rounded-2xl border-2 border-dashed border-brand/25 bg-brand-light/40 py-3.5 text-sm font-semibold text-brand"
           >
             + {label} 추가하기 ({items.length}/{max})
@@ -276,30 +294,80 @@ export default function FormRenderer({
     </>
   );
 
+  // 모바일 하단 바에 "○○ N명 작성 중" 카운터 — 첫 반복그룹 기준
+  const counterRg = schema.find((f) => f.block === "repeat_group") as RepeatGroupField | undefined;
+  const counterCount = counterRg
+    ? (Array.isArray(answers[counterRg.id]) ? (answers[counterRg.id] as unknown[]).length : 0)
+    : 0;
+
+  // PC에서는 이름·사번(신청자 정보)을 나란히 — 연속된 name/code 필드를 한 행으로 묶는다
+  const chunks: (FieldBlock | [FieldBlock, FieldBlock])[] = [];
+  for (let i = 0; i < schema.length; i++) {
+    const f = schema[i] as FieldBlock;
+    const n = schema[i + 1] as FieldBlock | undefined;
+    if (n && f.role === "submitter.name" && n.role === "submitter.code") {
+      chunks.push([f, n]);
+      i++;
+    } else {
+      chunks.push(f);
+    }
+  }
+
+  const renderTop = (field: FieldBlock) => {
+    if (field.block === "heading") {
+      return (
+        <h2
+          key={field.id}
+          className="mb-3 mt-7 flex items-center gap-2 text-[15px] font-bold text-brand-ink first:mt-0"
+        >
+          <span className="h-4 w-1 rounded-full bg-brand" aria-hidden />
+          {field.label}
+        </h2>
+      );
+    }
+    return field.block === "repeat_group"
+      ? renderRepeatGroup(field)
+      : renderSimple(field, field.id, answers[field.id], (v) => set(field.id, v));
+  };
+
   return (
     <div className={stickySubmit ? "pb-28" : ""}>
-      {schema.map((field) => {
-        if (field.block === "heading") {
-          return (
-            <h2
-              key={field.id}
-              className="mb-3 mt-7 flex items-center gap-2 text-[15px] font-bold text-brand-ink first:mt-0"
-            >
-              <span className="h-4 w-1 rounded-full bg-brand" aria-hidden />
-              {field.label}
-            </h2>
-          );
-        }
-        return field.block === "repeat_group"
-          ? renderRepeatGroup(field)
-          : renderSimple(field, field.id, answers[field.id], (v) => set(field.id, v));
-      })}
+      {chunks.map((chunk) =>
+        Array.isArray(chunk) ? (
+          <div key={chunk[0].id} className="lg:grid lg:grid-cols-2 lg:gap-x-4">
+            {chunk.map((f) => renderTop(f))}
+          </div>
+        ) : (
+          renderTop(chunk)
+        )
+      )}
 
       {stickySubmit ? (
         <>
-          {/* 모바일: 하단 고정 바 */}
+          {/* 모바일: 하단 고정 바 — 작성 중 인원 카운터 + 제출 버튼 */}
           <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-100 bg-white/95 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 shadow-floatbar backdrop-blur lg:hidden">
-            <div className="mx-auto max-w-md">{submitButton}</div>
+            <div className="mx-auto max-w-md">
+              {serverMessage && (
+                <p className="mb-2 text-center text-xs font-medium text-red-500">{serverMessage}</p>
+              )}
+              <div className="flex items-center gap-3">
+                {counterRg && (
+                  <span className="shrink-0 text-[13px] font-semibold leading-tight text-gray-500">
+                    {counterRg.itemLabel ?? counterRg.label}{" "}
+                    <b className="text-base text-brand">{counterCount}</b>명
+                    <span className="block text-[11px] font-normal text-gray-400">작성 중</span>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={handleSubmit}
+                  className="btn-primary flex-1 py-4 text-base"
+                >
+                  {pending ? "접수하고 있어요..." : submitLabel}
+                </button>
+              </div>
+            </div>
           </div>
           {/* PC: 폼 흐름 안 인라인 버튼 */}
           <div className="mt-6 hidden lg:block">{submitButton}</div>
