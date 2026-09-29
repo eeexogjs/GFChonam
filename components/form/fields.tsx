@@ -289,6 +289,16 @@ export function AddressInput({
   const embedRef = useRef<HTMLDivElement>(null);
   const v = value ?? { postcode: "", address: "", detail: "" };
 
+  // 검색 레이어가 열린 동안 뒤 페이지 스크롤 잠금 (모바일 전체화면 UX)
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open || !embedRef.current) return;
     let cancelled = false;
@@ -329,17 +339,29 @@ export function AddressInput({
         />
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => setOpen(true)}
           className="shrink-0 rounded-xl bg-brand-ink px-4 py-3 text-sm font-medium text-white"
         >
-          {open ? "닫기" : "주소 검색"}
+          주소 검색
         </button>
       </div>
+      {/* 주소 검색 — 모바일은 전체화면, PC는 중앙 모달 (좁은 카드 안 이중 스크롤 방지) */}
       {open && (
-        <div
-          ref={embedRef}
-          className="mt-2 h-[420px] w-full overflow-hidden rounded-xl border border-gray-200"
-        />
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/45 sm:items-center sm:justify-center sm:p-6">
+          <div className="flex h-full w-full flex-col overflow-hidden bg-white sm:h-[600px] sm:max-w-lg sm:rounded-2xl sm:shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-3">
+              <p className="text-sm font-bold text-brand-ink">주소 검색</p>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-lg border border-gray-200 px-3.5 py-1.5 text-sm font-medium text-gray-600"
+              >
+                닫기
+              </button>
+            </div>
+            <div ref={embedRef} className="min-h-0 w-full flex-1" />
+          </div>
+        </div>
       )}
       <input
         type="text"
