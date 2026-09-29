@@ -4,6 +4,7 @@ import BrandHeader from "@/components/BrandHeader";
 import RulesSummary from "@/components/RulesSummary";
 import FormRenderer from "@/components/form/FormRenderer";
 import { createAdminClient } from "@/lib/supabase/server";
+import { applyBranchOptions, fetchBranchNames } from "@/lib/branch-options";
 import type { FormSchema } from "@/lib/form-schema";
 import { submitAnswers } from "./actions";
 
@@ -58,6 +59,10 @@ export default async function TopicPage({
   const topic = await getTopic(slug);
   if (!topic) notFound();
 
+  // 지점 관리에 등록된 지점을 "지점" 선택지로 주입 (등록이 없으면 스키마 원본 유지)
+  const branchNames = await fetchBranchNames(createAdminClient());
+  const schema = applyBranchOptions(topic.form_schema, branchNames);
+
   const isDraft = topic.status === "draft";
   const closed =
     topic.status !== "open" ||
@@ -83,7 +88,7 @@ export default async function TopicPage({
             {/* 접수 규칙 — 모바일에서는 안내문 아래, PC에서는 우측 패널 */}
             {!closed && (
               <div className="lg:hidden">
-                <RulesSummary topic={topic} schema={topic.form_schema} variant="inline" />
+                <RulesSummary topic={topic} schema={schema} variant="inline" />
               </div>
             )}
 
@@ -110,7 +115,7 @@ export default async function TopicPage({
                 </div>
               ) : (
                 <FormRenderer
-                  schema={topic.form_schema}
+                  schema={schema}
                   submitLabel="입력 내용 확인하기"
                   action={submitAnswers.bind(null, slug)}
                 />
@@ -122,7 +127,7 @@ export default async function TopicPage({
           {!closed && (
             <aside className="hidden lg:block">
               <div className="sticky top-8">
-                <RulesSummary topic={topic} schema={topic.form_schema} variant="card" />
+                <RulesSummary topic={topic} schema={schema} variant="card" />
               </div>
             </aside>
           )}

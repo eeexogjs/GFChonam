@@ -3,6 +3,7 @@ import TopicBuilder from "@/components/builder/TopicBuilder";
 import { createAdminClient } from "@/lib/supabase/server";
 import { isoToDeadlineInput } from "@/lib/topic-validation";
 import type { FormSchema } from "@/lib/form-schema";
+import type { InviteSettings } from "@/lib/invite";
 import { saveTopic } from "../../actions";
 
 export const revalidate = 0;
@@ -18,7 +19,7 @@ export default async function EditTopicPage({
 
   const { data: topic } = await admin
     .from("topics")
-    .select("title, slug, type, description, deadline, per_person_limit, capacity, form_schema, submissions(count)")
+    .select("title, slug, type, description, deadline, per_person_limit, capacity, form_schema, invite, submissions(count)")
     .eq("slug", slug)
     .is("submissions.deleted_at", null)
     .single<{
@@ -30,6 +31,7 @@ export default async function EditTopicPage({
       per_person_limit: number | null;
       capacity: number | null;
       form_schema: FormSchema;
+      invite: InviteSettings | null;
       submissions: { count: number }[];
     }>();
 
@@ -48,6 +50,7 @@ export default async function EditTopicPage({
         perPersonLimit: topic.per_person_limit,
         capacity: topic.capacity,
         schema: topic.form_schema,
+        invite: topic.invite,
       }}
       action={saveTopic.bind(null, slug)}
     />
