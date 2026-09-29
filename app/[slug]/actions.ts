@@ -8,6 +8,7 @@ import {
 } from "@/lib/form-schema";
 import { validateAnswers, type FieldErrors } from "@/lib/validation";
 import { createAdminClient, createAnonServerClient } from "@/lib/supabase/server";
+import { applyBranchOptions, fetchBranchNames } from "@/lib/branch-options";
 import type { SubmitResult } from "@/components/form/FormRenderer";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -70,6 +71,9 @@ export async function submitAnswers(slug: string, answers: Answers): Promise<Sub
   if (!topic) return { ok: false, message: "존재하지 않는 접수입니다." };
   if (isClosed(topic))
     return { ok: false, message: "접수가 마감되었습니다. 담당자에게 문의해주세요." };
+
+  // 화면과 동일하게 등록된 지점 목록을 선택지로 주입한 뒤 검증 (화면-서버 불일치 방지)
+  topic.form_schema = applyBranchOptions(topic.form_schema, await fetchBranchNames(admin));
 
   const errors = validateAnswers(topic.form_schema, answers);
   if (Object.keys(errors).length > 0) return { ok: false, errors };
@@ -160,6 +164,8 @@ export async function updateAnswers(slug: string, editToken: string, answers: An
   const topic = submission.topics as unknown as TopicRow;
   if (isClosed(topic))
     return { ok: false, message: "마감된 접수는 수정할 수 없어요. 담당자에게 문의해주세요." };
+
+  topic.form_schema = applyBranchOptions(topic.form_schema, await fetchBranchNames(admin));
 
   const errors = validateAnswers(topic.form_schema, answers);
   if (Object.keys(errors).length > 0) return { ok: false, errors };

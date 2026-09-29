@@ -17,6 +17,20 @@ export function validateTopicPayload(p: TopicPayload): string | null {
   if (p.capacity !== null && (p.capacity < 1 || p.capacity > 10000))
     return "정원은 1~10,000 사이로 입력해주세요.";
 
+  if (Array.isArray(p.info)) {
+    if (p.info.length > 12) return "안내 정보는 12줄까지 등록할 수 있어요.";
+    for (const r of p.info) {
+      if ((r.label ?? "").length > 20) return "안내 정보 항목명은 20자 이내로 입력해주세요.";
+      if ((r.value ?? "").length > 200) return "안내 정보 내용은 200자 이내로 입력해주세요.";
+    }
+  }
+
+  if (p.invite?.enabled) {
+    if (!p.invite.eventName?.trim()) return "초대장을 켰다면 행사명을 입력해주세요.";
+    if (p.invite.eventName.length > 40) return "초대장 행사명은 40자 이내로 입력해주세요.";
+    if ((p.invite.greeting ?? "").length > 300) return "초대장 인사말은 300자 이내로 입력해주세요.";
+  }
+
   const schema = p.schema as FormSchema;
   if (!Array.isArray(schema) || schema.length === 0)
     return "입력 항목을 1개 이상 추가해주세요.";
