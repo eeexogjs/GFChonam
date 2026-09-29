@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import BranchesForm from "./BranchesForm";
+import DeleteBranchButton from "./DeleteBranchButton";
 
 export const revalidate = 0;
 
@@ -35,6 +36,7 @@ export default async function BranchesPage() {
                   <th className="py-1">지점명</th>
                   <th className="py-1 text-right">설계사수</th>
                   <th className="py-1 text-right">지점장</th>
+                  <th className="py-1 text-right" aria-label="삭제" />
                 </tr>
               </thead>
               <tbody>
@@ -51,6 +53,9 @@ export default async function BranchesPage() {
                       ) : (
                         <span className="text-xs text-orange-400">미등록</span>
                       )}
+                    </td>
+                    <td className="py-1.5 pl-2 text-right">
+                      <DeleteBranchButton name={b.name} />
                     </td>
                   </tr>
                 ))}

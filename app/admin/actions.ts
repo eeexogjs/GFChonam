@@ -151,6 +151,14 @@ export async function saveBranches(
   };
 }
 
+/** 지점 삭제 — 지점 행만 지운다. 제출 데이터는 지점명 텍스트로 남아 있으므로 영향 없음 */
+export async function deleteBranch(name: string) {
+  const admin = createAdminClient();
+  await admin.from("branches").delete().eq("name", name);
+  revalidatePath("/admin/branches");
+  revalidatePath("/manager");
+}
+
 /**
  * 주제 저장 — originalSlug가 null이면 신규 개설, 있으면 해당 주제 수정.
  * 클라이언트 빌더를 신뢰하지 않고 여기서 전체 재검증한다.
