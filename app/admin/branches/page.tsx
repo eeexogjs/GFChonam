@@ -20,8 +20,9 @@ export default async function BranchesPage() {
     <main>
       <h1 className="text-lg font-bold text-brand-ink">지점 관리</h1>
       <p className="mt-1 text-sm text-gray-500">
-        지점명과 <b>설계사수</b>를 등록하면 지점장 모드에서 <b>제출 직원 X/설계사수</b>와{" "}
-        <b>미제출 인원</b>이 표시됩니다. 등록하지 않은 지점은 건수만 표시돼요.
+        여기 등록된 지점이 <b>신청 화면의 &lsquo;지점&rsquo; 선택지</b>로 그대로 쓰입니다.
+        <b>설계사수</b>는 지점장 모드에서 제출 직원 수의 분모로, <b>지점장 성함/사번</b>은
+        지점장 모드 로그인에 사용돼요.
       </p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
