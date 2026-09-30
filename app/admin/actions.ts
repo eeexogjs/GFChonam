@@ -180,6 +180,11 @@ export async function saveTopic(
     per_person_limit: payload.perPersonLimit,
     capacity: payload.capacity,
     form_schema: payload.schema,
+    invite: payload.invite ?? null,
+    // 항목명·내용이 모두 채워진 줄만 저장 (빈 줄은 표시 안 됨 원칙과 일치)
+    info: (payload.info ?? [])
+      .map((r) => ({ label: r.label.trim(), value: r.value.trim() }))
+      .filter((r) => r.label && r.value),
   };
 
   if (originalSlug === null) {
