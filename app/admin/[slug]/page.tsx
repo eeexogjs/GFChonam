@@ -7,6 +7,7 @@ import { buildColumns, formatSeoulTime } from "@/lib/export-columns";
 import CopyLinkButton from "@/components/CopyLinkButton";
 import { STATUS_LABEL } from "@/lib/labels";
 import { setTopicStatus, softDeleteSubmission } from "../actions";
+import DeleteTopicButton from "./DeleteTopicButton";
 
 export const revalidate = 0;
 
@@ -120,6 +121,8 @@ export default async function AdminTopicPage({
                 {isDraft ? "공개하기" : isOpen ? "마감하기" : "다시 열기"}
               </button>
             </form>
+            {/* 삭제는 마감/초안 상태에서만 — 공개 중 실수 삭제 방지 */}
+            {!isOpen && <DeleteTopicButton slug={slug} title={topic.title} count={all.length} />}
           </div>
         </div>
 
