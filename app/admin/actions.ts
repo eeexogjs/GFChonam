@@ -151,6 +151,24 @@ export async function saveBranches(
   };
 }
 
+/**
+ * 취합 삭제 — 응답 데이터까지 완전히 지운다 (복구 불가).
+ * 실수 방지를 위해 "공개 중(open)" 취합은 삭제할 수 없다 — 먼저 마감해야 한다.
+ */
+export async function deleteTopic(slug: string) {
+  const admin = createAdminClient();
+  const { data: t } = await admin
+    .from("topics")
+    .select("id, status")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!t || t.status === "open") return; // 공개 중 삭제 금지
+  await admin.from("submissions").delete().eq("topic_id", t.id);
+  await admin.from("topics").delete().eq("id", t.id);
+  revalidatePath("/admin");
+  redirect("/admin");
+}
+
 /** 지점 삭제 — 지점 행만 지운다. 제출 데이터는 지점명 텍스트로 남아 있으므로 영향 없음 */
 export async function deleteBranch(name: string) {
   const admin = createAdminClient();
@@ -180,6 +198,11 @@ export async function saveTopic(
     per_person_limit: payload.perPersonLimit,
     capacity: payload.capacity,
     form_schema: payload.schema,
+    invite: payload.invite ?? null,
+    // 항목명·내용이 모두 채워진 줄만 저장 (빈 줄은 표시 안 됨 원칙과 일치)
+    info: (payload.info ?? [])
+      .map((r) => ({ label: r.label.trim(), value: r.value.trim() }))
+      .filter((r) => r.label && r.value),
   };
 
   if (originalSlug === null) {
